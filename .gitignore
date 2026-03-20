@@ -137,3 +137,34 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# --- Standardowe dla NestJS / Node ---
+node_modules/
+dist/
+npm-debug.log
+yarn-error.log
+package-lock.json
+yarn.lock
+
+# --- Docker & Środowisko ---
+# WAŻNE: Nigdy nie wrzucaj .env z prawdziwymi hasłami!
+.env
+.env.local
+.env.*.local
+
+# --- Baza Danych (Lokalne pliki) ---
+# Jeśli montujesz wolumeny Postgresa w Dockerze, nie pchanij danych do Gita!
+pgdata/
+postgres_data/
+redis_data/
+
+# --- Pliki Systemowe i IDE ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# --- Firebase Admin SDK Keys ---
+# Jeśli pobierzesz plik JSON z kluczem do Firebase, ukryj go!
+firebase-adminsdk.json
+serviceAccountKey.json
