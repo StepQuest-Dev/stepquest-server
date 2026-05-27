@@ -39,6 +39,10 @@ coverage/
 .stylelintcache
 .cache/
 .parcel-cache/
+.pnpm-store/
+
+#docker
+.docker/
 
 #database
 pgdata/

@@ -70,6 +70,36 @@ $ mau deploy
 
 With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
 
+## Mobile steps API
+
+This server supports JWT auth and step upload/download for a mobile app.
+
+### Available endpoints
+
+- `POST /api/v1/auth/register` — register with `email`, `username`, `password`
+- `POST /api/v1/auth/login` — login with `email`, `password`, returns `access_token`
+- `GET /api/v1/auth/me` — get current user profile, requires `Authorization: Bearer <token>`
+- `POST /api/v1/steps` — send a step record, requires `Authorization: Bearer <token>`
+- `GET /api/v1/steps` — list recent step records plus total steps, requires `Authorization: Bearer <token>`
+- `GET /api/v1/steps/latest` — fetch the most recent step record, requires `Authorization: Bearer <token>`
+
+### Running locally with Docker
+
+1. Copy `.env.example` to `.env` and adjust values if needed.
+2. Start services:
+
+```bash
+docker compose up --build
+```
+
+3. Run Prisma schema push if database is new:
+
+```bash
+npm run prisma:push
+```
+
+4. Connect your frontend/mobile app to `http://localhost:3000/api/v1`.
+
 ## Resources
 
 Check out a few resources that may come in handy when working with NestJS:
