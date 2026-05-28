@@ -14,7 +14,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U stepquest']
+      test: ['CMD-SHELL', 'pg_isready -U stepquest -d stepquest_db']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -40,13 +40,24 @@ services:
       dockerfile: Dockerfile
     container_name: stepquest_api
     restart: unless-stopped
-    env_file: .env.example
     ports:
       - '3000:3000'
+    environment:
+      # 1. Połączenie z bazą (wskazuje na kontener postgres)
+      DATABASE_URL: "postgresql://stepquest:stepquest_dev_password@postgres:5432/stepquest_db?schema=public"
+      
+      # 2. Klucze dla konfiguracji JWT
+      JWT_SECRET: "moje_super_tajne_haslo_stepquest_123!"
+      JWT_EXPIRES_IN: "7d"
+      
+      # 3. Klucze dla konfiguracji Redisa (wskazuje na kontener redis)
+      REDIS_HOST: "redis"
+      REDIS_PORT: "6379"
     depends_on:
-      - postgres
-      - redis
-
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 volumes:
   postgres_data:
   redis_data:
