@@ -9,8 +9,18 @@ async function bootstrap() {
 
   const config = app.get(ConfigService);
 
-  app.use(helmet());
-  app.enableCors();
+  app.use(helmet({
+    crossOriginResourcePolicy: false,
+  }));
+  
+  app.enableCors({
+    origin: (origin, callback) => {
+      callback(null, true);
+    },
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    credentials: true,
+    allowedHeaders: 'Content-Type, Accept, Authorization',
+  });
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -23,7 +33,7 @@ async function bootstrap() {
   app.setGlobalPrefix('api/v1');
 
   const port = config.get<number>('port') ?? 3000;
-  await app.listen(port);
-  console.log(`Server running on http://localhost:${port}/api/v1`);
+  await app.listen(port, '0.0.0.0');
+  console.log(`Server running on http://0.0.0.0:${port}/api/v1`);
 }
 bootstrap();
