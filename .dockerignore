@@ -7,3 +7,4 @@ Dockerfile
 dist
 coverage
 .env
+*.tsbuildinfo
