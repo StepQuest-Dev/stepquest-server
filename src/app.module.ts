@@ -4,6 +4,7 @@ import { RedisModule } from '@nestjs-modules/ioredis';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { StepsModule } from './steps/steps.module';
+import { CombatModule } from './combat/combat.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -25,6 +26,7 @@ import configuration from './config/configuration';
     PrismaModule,
     AuthModule,
     StepsModule,
+    CombatModule,
   ],
 })
 export class AppModule {}
