@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
@@ -25,9 +26,17 @@ model Character {
   level     Int      @default(1)
   exp       Int      @default(0)
   gold      Int      @default(0)
+  
+  hp          Int      @default(100)
+  maxHp       Int      @default(100)
+  attack      Int      @default(10)
+  defense     Int      @default(5)
+
   totalSteps Int     @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  battles     Battle[]
 }
 
 model StepRecord {
@@ -39,4 +48,36 @@ model StepRecord {
   source     String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+}
+
+model Enemy {
+  id          String   @id @default(uuid())
+  name        String
+  level       Int
+  hp          Int
+  attack      Int
+  defense     Int
+  goldReward  Int
+  expReward   Int
+  imageUrl    String?  // Link do assetu w aplikacji RN
+  battles     Battle[]
+}
+
+model Battle {
+  id          String   @id @default(uuid())
+  characterId String
+  character   Character @relation(fields: [characterId], references: [id])
+  enemyId     String
+  enemy       Enemy     @relation(fields: [enemyId], references: [id])
+  
+  status      BattleStatus @default(PENDING) // PENDING, WON, LOST
+  log         Json?        // Przebieg walki (np. tablica uderzeń)
+  
+  createdAt   DateTime @default(now())
+}
+
+enum BattleStatus {
+  PENDING
+  WON
+  LOST
 }
