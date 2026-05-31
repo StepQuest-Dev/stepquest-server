@@ -51,17 +51,26 @@ export class AuthService {
     return isPasswordValid ? user : null;
   }
 
-  async login(dto: LoginDto) {
-    const user = await this.validateUser(dto.email, dto.password);
+async login(dto: LoginDto) {
+  const user = await this.validateUser(dto.email, dto.password);
 
-    if (!user) {
-      throw new UnauthorizedException('Invalid email or password');
-    }
-
-    return {
-      access_token: this.jwtService.sign({ sub: user.id }),
-    };
+  if (!user) {
+    throw new UnauthorizedException('Invalid email or password');
   }
+
+  // Pobierz characterId
+  const character = await this.prisma.character.findUnique({
+    where: { userId: user.id },
+    select: { id: true },
+  });
+
+  return {
+    access_token: this.jwtService.sign({
+      sub: user.id,
+      characterId: character?.id ?? null,
+    }),
+  };
+}
 
   async getProfile(userId: string) {
     const user = await this.prisma.user.findUnique({

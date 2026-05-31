@@ -8,7 +8,9 @@ export enum CombatActionType {
 }
 
 export class CombatActionDto {
-  @IsUUID()    sessionId!: string;
-  @IsUUID()    characterId!: string;
-  @IsEnum(CombatActionType) action!: CombatActionType;
+  @IsUUID()
+  sessionId!: string;
+
+  @IsEnum(CombatActionType)
+  action!: CombatActionType;
 }
