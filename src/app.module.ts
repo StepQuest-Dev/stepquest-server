@@ -6,6 +6,7 @@ import { AuthModule } from './auth/auth.module';
 import { StepsModule } from './steps/steps.module';
 import { CombatModule } from './combat/combat.module';
 import configuration from './config/configuration';
+import { EnemiesModule } from './enemies/enemies.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import configuration from './config/configuration';
     AuthModule,
     StepsModule,
     CombatModule,
+    EnemiesModule,
   ],
 })
 export class AppModule {}
