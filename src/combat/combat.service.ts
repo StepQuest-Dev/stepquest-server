@@ -25,6 +25,9 @@ interface CombatSessionState {
   enemyDefense: number;
   enemyExpReward: number;
   enemyGoldReward: number;
+  characterClass: string | null;
+  characterBonus: string | null;
+  characterTurn: number;
 }
 
 const SESSION_TTL_SECONDS = 60 * 30; // 30 minut
@@ -49,7 +52,7 @@ private async getSession(sessionId: string): Promise<CombatSessionState> {
 }
 
 private async saveSession(sessionId: string, state: CombatSessionState) {
-  const result = await this.redis.set(
+  await this.redis.set(
     this.sessionKey(sessionId),
     JSON.stringify(state),
     'EX',
@@ -66,6 +69,7 @@ private async saveSession(sessionId: string, state: CombatSessionState) {
   async startCombat(characterId: string, enemyId: string) {
     const character = await this.prisma.character.findUnique({
       where: { id: characterId },
+      include: { class: true },
     });
     const enemy = await this.prisma.enemy.findUnique({
       where: { id: enemyId },
@@ -105,6 +109,9 @@ private async saveSession(sessionId: string, state: CombatSessionState) {
       characterMaxHp: character.maxHp,
       characterTotalSteps: stepsToday,
       characterUserId: character.userId,
+      characterClass: character.class?.name ?? null,
+      characterBonus: character.class?.bonus ?? null,
+      characterTurn: 0,
       enemyName: enemy.name,
       enemyAttack: enemy.attack,
       enemyDefense: enemy.defense,
@@ -140,14 +147,13 @@ private async saveSession(sessionId: string, state: CombatSessionState) {
       throw new BadRequestException('Walka już się zakończyła');
     }
 
+    state.characterTurn += 1;  // ← po walidacji
     const turnLog: typeof state.log = [];
 
     // ── AKCJA GRACZA ──────────────────────────────────────────
 
     if (action === CombatActionType.FLEE) {
-      // 40% szansy na ucieczkę
       const escaped = Math.random() < 0.4;
-
       if (escaped) {
         state.status = 'FLED';
         await this.deleteSession(sessionId);
@@ -165,10 +171,50 @@ private async saveSession(sessionId: string, state: CombatSessionState) {
         });
       }
     } else if (action === CombatActionType.ATTACK) {
-      const stepBonus = this.calculateStepBonus(state.characterTotalSteps);
+      const stepBonus = this.calculateStepBonus(state.characterTotalSteps, state.characterBonus);
       const baseDamage = Math.max(1, state.characterAttack - state.enemyDefense);
-      const damage = Math.floor(baseDamage * (1 + stepBonus));
-      state.enemyHp -= damage;
+      let damage = Math.floor(baseDamage * (1 + stepBonus));
+
+      // ── BONUSY KLAS ───────────────────────────────────────
+
+      // WARRIOR: +20% obrażeń przy HP < 50% maxHp
+      if (state.characterBonus === 'WARRIOR') {
+        const hpThreshold = state.characterMaxHp * 0.5;
+        if (state.playerHp < hpThreshold) {
+          damage = Math.floor(damage * 1.2);
+          turnLog.push({
+            attacker: state.characterName,
+            target: state.enemyName,
+            damage: 0,
+            action: 'WARRIOR_RAGE',
+          });
+        }
+      }
+
+      // DOUBLE_STRIKE: co 3. tura gracza podwójne obrażenia
+      if (state.characterBonus === 'DOUBLE_STRIKE' && state.characterTurn % 3 === 0) {
+        damage = damage * 2;
+        turnLog.push({
+          attacker: state.characterName,
+          target: state.enemyName,
+          damage: 0,
+          action: 'DOUBLE_STRIKE',
+        });
+      }
+
+      // MONK_REGEN: 2% szansa na auto-wygraną
+      if (state.characterBonus === 'MONK_REGEN' && Math.random() < 0.02) {
+        state.enemyHp = 0;
+        turnLog.push({
+          attacker: state.characterName,
+          target: state.enemyName,
+          damage: 0,
+          action: 'MONK_INSTANT_WIN',
+        });
+      }  else {
+        state.enemyHp -= damage;  // ← tylko jeśli nie było instant win
+      }
+
       turnLog.push({
         attacker: state.characterName,
         target: state.enemyName,
@@ -176,14 +222,14 @@ private async saveSession(sessionId: string, state: CombatSessionState) {
         action: 'ATTACK',
         targetHpAfter: Math.max(0, state.enemyHp),
       });
+
     } else if (action === CombatActionType.USE_ITEM) {
-      // Placeholder — rozbuduj gdy dodasz ekwipunek
       const heal = 20;
       state.playerHp = Math.min(state.playerHp + heal, state.characterMaxHp);
       turnLog.push({
         attacker: state.characterName,
         target: state.characterName,
-        damage: -heal, // ujemna = leczenie
+        damage: -heal,
         action: 'USE_ITEM',
       });
     }
@@ -199,6 +245,18 @@ private async saveSession(sessionId: string, state: CombatSessionState) {
         damage: enemyDamage,
         action: 'ATTACK',
         targetHpAfter: Math.max(0, state.playerHp),
+      });
+    }
+
+    // ── MONK_REGEN: regeneracja HP po turze ──────────────────
+    if (state.characterBonus === 'MONK_REGEN' && state.enemyHp > 0) {
+      const regen = 5;
+      state.playerHp = Math.min(state.playerHp + regen, state.characterMaxHp);
+      turnLog.push({
+        attacker: state.characterName,
+        target: state.characterName,
+        damage: -regen,
+        action: 'MONK_REGEN',
       });
     }
 
@@ -230,52 +288,54 @@ private async saveSession(sessionId: string, state: CombatSessionState) {
 
   // ── FINALIZACJA ───────────────────────────────────────────────
 
-  private async finalizeSession(sessionId: string, state: CombatSessionState) {
-    const won = state.status === 'WON';
+private async finalizeSession(sessionId: string, state: CombatSessionState) {
+  const won = state.status === 'WON';
 
-    // Zapisz Battle w Postgresie
-    const battle = await this.prisma.battle.create({
+  const battle = await this.prisma.battle.create({
+    data: {
+      characterId: state.characterId,
+      enemyId: state.enemyId,
+      sessionId,
+      status: won ? 'WON' : 'LOST',
+      log: state.log,
+    },
+  });
+
+  await this.prisma.combatSession.update({
+    where: { id: sessionId },
+    data: { status: won ? 'WON' : 'LOST' },
+  });
+
+  let levelUp: { levelsGained: number; newLevel: number; hpGain: number; attackGain: number; defenseGain: number } | null = null;
+
+  if (won) {
+    await this.prisma.character.update({
+      where: { id: state.characterId },
       data: {
-        characterId: state.characterId,
-        enemyId: state.enemyId,
-        sessionId,
-        status: won ? 'WON' : 'LOST',
-        log: state.log,
+        exp:  { increment: state.enemyExpReward },
+        gold: { increment: state.enemyGoldReward },
+        hp:   state.playerHp,
       },
     });
 
-    // Zaktualizuj status sesji
-    await this.prisma.combatSession.update({
-      where: { id: sessionId },
-      data: { status: won ? 'WON' : 'LOST' },
-    });
+    levelUp = await this.handleLeveling(state.characterId);  // ← wywołanie
+  }
 
-    // Nagrody jeśli wygrał
-    if (won) {
-      await this.prisma.character.update({
-        where: { id: state.characterId },
-        data: {
-          exp:  { increment: state.enemyExpReward },
-          gold: { increment: state.enemyGoldReward },
-          hp:   state.playerHp, // zapisz aktualne HP
-        },
-      });
+  await this.deleteSession(sessionId);
+
+  return {
+    result: won ? 'Victory!' : 'Defeat',
+    sessionId,
+    battleId: battle.id,
+    remainingHp: state.playerHp,
+    rewards: won
+      ? { exp: state.enemyExpReward, gold: state.enemyGoldReward }
+      : null,
+    levelUp,
+    log: state.log,
+      };
     }
 
-    // Wyczyść Redis
-    await this.deleteSession(sessionId);
-
-    return {
-      result: won ? 'Victory!' : 'Defeat',
-      sessionId,
-      battleId: battle.id,
-      remainingHp: state.playerHp,
-      rewards: won
-        ? { exp: state.enemyExpReward, gold: state.enemyGoldReward }
-        : null,
-      log: state.log,
-    };
-  }
     async getCombatHistory(characterId: string) {
     const battles = await this.prisma.battle.findMany({
       where: { characterId },
@@ -305,10 +365,56 @@ private async saveSession(sessionId: string, state: CombatSessionState) {
     };
   }
 
-    private calculateStepBonus(totalSteps: number): number {
-    const maxSteps = 5000;
-    const maxBonus = 0.5; // 50%
-    const ratio = Math.min(totalSteps, maxSteps) / maxSteps;
-    return ratio * maxBonus;
+    private calculateStepBonus(totalSteps: number, bonus: string | null): number {
+      const maxSteps = bonus === 'SCOUT' ? 7000 : 5000;
+      const maxBonus = bonus === 'SCOUT' ? 0.7 : 0.5;
+      const ratio = Math.min(totalSteps, maxSteps) / maxSteps;
+      return ratio * maxBonus;
   }
+
+    private async handleLeveling(characterId: string) {
+      const character = await this.prisma.character.findUnique({
+        where: { id: characterId },
+        include: { class: true },
+      });
+
+      if (!character) return null;
+
+      const expForNextLevel = character.level * 100;
+
+      if (character.exp < expForNextLevel) return null;
+
+      // Oblicz ile levelów naraz (jeśli zdobył dużo exp)
+      let newLevel = character.level;
+      let remainingExp = character.exp;
+
+      while (remainingExp >= newLevel * 100) {
+        remainingExp -= newLevel * 100;
+        newLevel += 1;
+      }
+
+      const levelsGained = newLevel - character.level;
+
+      // Przelicz statystyki na podstawie klasy
+      const hpGain     = (character.class?.hpPerLevel ?? 10) * levelsGained;
+      const attackGain = (character.class?.attackPerLevel ?? 2) * levelsGained;
+      const defenseGain = (character.class?.defensePerLevel ?? 1) * levelsGained;
+
+      // Mnich nie skaluje ataku
+      const finalAttackGain = character.class?.bonus === 'MONK_REGEN' ? 0 : attackGain;
+
+      await this.prisma.character.update({
+        where: { id: characterId },
+        data: {
+          level:   newLevel,
+          exp:     remainingExp,
+          maxHp:   { increment: hpGain },
+          hp:      { increment: hpGain }, // HP rośnie razem z maxHp
+          attack:  { increment: finalAttackGain },
+          defense: { increment: defenseGain },
+        },
+      });
+
+      return { levelsGained, newLevel, hpGain, attackGain: finalAttackGain, defenseGain };
+    }
 }

@@ -24,35 +24,90 @@ async function main() {
   await prisma.character.deleteMany({});
   await prisma.user.deleteMany({});
   await prisma.enemy.deleteMany({});
+  await prisma.class.deleteMany({});
 
   console.log('🧹 Baza wyczyszczona.');
 
   // 1. Tworzymy użytkownika i od razu przypisaną do niego postać
+  await prisma.class.createMany({
+    data: [
+      {
+        name: 'Wojownik',
+        description: 'Zahartowany w bitwach wojownik, który staje się groźniejszy gdy jest ranny.',
+        baseHp: 120,
+        baseAttack: 12,
+        baseDefense: 8,
+        hpPerLevel: 15,
+        attackPerLevel: 2,
+        defensePerLevel: 2,
+        bonus: 'WARRIOR',
+      },
+      {
+        name: 'Zwiadowca',
+        description: 'Zwinny łowca, którego codzienna aktywność przekłada się na siłę w walce.',
+        baseHp: 90,
+        baseAttack: 15,
+        baseDefense: 4,
+        hpPerLevel: 10,
+        attackPerLevel: 3,
+        defensePerLevel: 1,
+        bonus: 'SCOUT',
+      },
+      {
+        name: 'Czarnoksiężnik',
+        description: 'Mroczny mag gromadzący energię przez kilka tur, by wypuścić druzgocący cios.',
+        baseHp: 80,
+        baseAttack: 20,
+        baseDefense: 2,
+        hpPerLevel: 8,
+        attackPerLevel: 4,
+        defensePerLevel: 1,
+        bonus: 'DOUBLE_STRIKE',
+      },
+      {
+        name: 'Mnich',
+        description: 'Ascetyczny wojownik o żelaznej woli. Niezniszczalny, lecz zadaje minimalne obrażenia — zwycięża przez przetrwanie.',
+        baseHp: 1000,
+        baseAttack: 1,
+        baseDefense: 6,
+        hpPerLevel: 20,
+        attackPerLevel: 0,
+        defensePerLevel: 1,
+        bonus: 'MONK_REGEN',
+      },
+    ],
+  });
+
+  console.log('⚔️ Klasy utworzone.');
+
 
   const passwordHash = await bcrypt.hash('Haslo123', 10);
+
+  const warriorClass = await prisma.class.findUnique({
+  where: { name: 'Wojownik' },
+  });
 
   const user = await prisma.user.create({
     data: {
       email: 'test@test.com',
       username: 'UZ1',
-      passwordHash: passwordHash, // Tu wleci hash gdy dodasz auth
+      passwordHash,
       character: {
         create: {
           name: 'WojBody',
           level: 1,
-          hp: 100,
-          maxHp: 100,
-          attack: 15,
-          defense: 5,
+          hp: warriorClass!.baseHp,
+          maxHp: warriorClass!.baseHp,
+          attack: warriorClass!.baseAttack,
+          defense: warriorClass!.baseDefense,
           gold: 100,
           exp: 0,
           totalSteps: 0,
+          classId: warriorClass!.id,
         },
       },
     },
-    include: {
-      character: true,
-    },
+    include: { character: true },
   });
 
   console.log(`👤 Stworzono użytkownika: ${user.username} z postacią: ${user.character?.name}`);
