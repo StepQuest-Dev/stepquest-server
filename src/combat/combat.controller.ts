@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Request, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, Request, UseGuards, Get } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { CombatService } from './combat.service';
 import { StartCombatDto } from './dto/start-combat.dto';
@@ -17,5 +17,10 @@ export class CombatController {
   @Post('action')
   async processAction(@Body() dto: CombatActionDto, @Request() req: any) {
     return this.combatService.processAction(dto.sessionId, req.user.characterId, dto.action);
+  }
+
+  @Get('history')
+  async getCombatHistory(@Request() req: any) {
+    return this.combatService.getCombatHistory(req.user.characterId);
   }
 }

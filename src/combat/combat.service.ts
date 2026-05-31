@@ -261,4 +261,32 @@ private async saveSession(sessionId: string, state: CombatSessionState) {
       log: state.log,
     };
   }
+    async getCombatHistory(characterId: string) {
+    const battles = await this.prisma.battle.findMany({
+      where: { characterId },
+      select: {
+        id: true,
+        status: true,
+        createdAt: true,
+        log: true,
+        enemy: {
+          select: {
+            name: true,
+            level: true,
+            imageUrl: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 20, // ostatnie 20 walk
+    });
+
+    const won = battles.filter(b => b.status === 'WON').length;
+    const lost = battles.filter(b => b.status === 'LOST').length;
+
+    return {
+      stats: { won, lost, total: battles.length },
+      battles,
+    };
+  }
 }

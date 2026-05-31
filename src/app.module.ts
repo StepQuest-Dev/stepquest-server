@@ -7,6 +7,7 @@ import { StepsModule } from './steps/steps.module';
 import { CombatModule } from './combat/combat.module';
 import configuration from './config/configuration';
 import { EnemiesModule } from './enemies/enemies.module';
+import { CharacterModule } from './character/character.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { EnemiesModule } from './enemies/enemies.module';
     StepsModule,
     CombatModule,
     EnemiesModule,
+    CharacterModule,
   ],
 })
 export class AppModule {}
