@@ -21,7 +21,13 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
-  me(@CurrentUser('userId') userId: string) {
+  me(@CurrentUser() user: any) {
+    console.log('--- [CONTROLLER] Pobrany obiekt user z dekoratora ---', user);
+    
+    // Wyciągamy ID ze struktury, którą zwraca JwtStrategy
+    const userId = user?.userId;
+    
+    console.log(`--- [CONTROLLER] Przekazuję userId: "${userId}" do AuthService ---`);
     return this.authService.getProfile(userId);
   }
 }
