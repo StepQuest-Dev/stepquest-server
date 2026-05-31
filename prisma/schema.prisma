@@ -38,6 +38,7 @@ model Character {
 
   battles     Battle[]
   combatSessions CombatSession[]
+  discoveredPlaces DiscoveredPlace[]
 }
 
 model StepRecord {
@@ -103,4 +104,17 @@ enum CombatAction {
   ATTACK
   FLEE
   USE_ITEM
+}
+
+model DiscoveredPlace {
+  id           String    @id @default(uuid())
+  characterId  String
+  character    Character @relation(fields: [characterId], references: [id])
+  name         String
+  lat          Float
+  lon          Float
+  osmId        String
+  discoveredAt DateTime  @default(now())
+  isCollected  Boolean   @default(false)
+  collectedAt  DateTime?
 }
