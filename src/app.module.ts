@@ -9,6 +9,7 @@ import configuration from './config/configuration';
 import { EnemiesModule } from './enemies/enemies.module';
 import { CharacterModule } from './character/character.module';
 import { ClassesModule } from './classes/classes.module';
+import { PlacesModule } from './places/places.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { ClassesModule } from './classes/classes.module';
     EnemiesModule,
     CharacterModule,
     ClassesModule,
+    PlacesModule,
   ],
 })
 export class AppModule {}
