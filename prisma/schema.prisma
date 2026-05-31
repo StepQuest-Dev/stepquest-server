@@ -138,7 +138,7 @@ enum ClassBonus {
 model DiscoveredPlace {
   id           String    @id @default(uuid())
   characterId  String
-  character    Character @relation(fields: [characterId], references: [id])
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
   name         String
   lat          Float
   lon          Float

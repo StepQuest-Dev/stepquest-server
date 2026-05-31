@@ -5,7 +5,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CombatActionType } from './dto/combat-action.dto';
 
 interface CombatSessionState {
-  characterId: string;
+  characterId: string; // Prawdziwe ID postaci (UUID z tabeli Character)
+  userId: string;      // ID zalogowanego gracza (dla bezpiecznej weryfikacji)
   enemyId: string;
   playerHp: number;
   enemyHp: number;
@@ -19,7 +20,6 @@ interface CombatSessionState {
   characterDefense: number;
   characterMaxHp: number;
   characterTotalSteps: number;
-  characterUserId: string;
   enemyName: string;
   enemyAttack: number;
   enemyDefense: number;
@@ -45,20 +45,20 @@ export class CombatService {
     return `combat:session:${sessionId}`;
   }
 
-private async getSession(sessionId: string): Promise<CombatSessionState> {
-  const raw = await this.redis.get(this.sessionKey(sessionId));
-  if (!raw) throw new NotFoundException('Sesja walki nie istnieje lub wygasła');
-  return JSON.parse(raw) as CombatSessionState;
-}
+  private async getSession(sessionId: string): Promise<CombatSessionState> {
+    const raw = await this.redis.get(this.sessionKey(sessionId));
+    if (!raw) throw new NotFoundException('Sesja walki nie istnieje lub wygasła');
+    return JSON.parse(raw) as CombatSessionState;
+  }
 
-private async saveSession(sessionId: string, state: CombatSessionState) {
-  await this.redis.set(
-    this.sessionKey(sessionId),
-    JSON.stringify(state),
-    'EX',
-    SESSION_TTL_SECONDS,
-  );
-}
+  private async saveSession(sessionId: string, state: CombatSessionState) {
+    await this.redis.set(
+      this.sessionKey(sessionId),
+      JSON.stringify(state),
+      'EX',
+      SESSION_TTL_SECONDS,
+    );
+  }
 
   private async deleteSession(sessionId: string) {
     await this.redis.del(this.sessionKey(sessionId));
@@ -66,22 +66,29 @@ private async saveSession(sessionId: string, state: CombatSessionState) {
 
   // ── START ─────────────────────────────────────────────────────
 
-  async startCombat(characterId: string, enemyId: string) {
+  async startCombat(userId: string, enemyId: string) { // UWAGA: przychodzi userId!
+
+    // 1. ZNAJDŹ POSTAĆ NA PODSTAWIE userId Z TOKENA
     const character = await this.prisma.character.findUnique({
-      where: { id: characterId },
+      where: { userId }, 
       include: { class: true },
     });
+
     const enemy = await this.prisma.enemy.findUnique({
       where: { id: enemyId },
     });
 
     if (!character || !enemy) {
-      throw new NotFoundException('Postać lub przeciwnik nie istnieje');
+      throw new NotFoundException('Postać gracza lub przeciwnik nie istnieje');
     }
 
-    // Utwórz rekord sesji w DB (status PENDING)
+    // 2. TWORZENIE SESJI: Używamy character.id (prawdziwego ID postaci)!
     const session = await this.prisma.combatSession.create({
-      data: { characterId, enemyId, status: 'PENDING' },
+      data: { 
+        characterId: character.id, // TO NAPRAWIA TWÓJ BŁĄD P2003
+        enemyId, 
+        status: 'PENDING' 
+      },
     });
 
     const today = new Date();
@@ -91,12 +98,13 @@ private async saveSession(sessionId: string, state: CombatSessionState) {
       where: { userId: character.userId },
     });
 
-      const stepsToday = stepRecord && stepRecord.recordedAt >= today
-    ? stepRecord.count
-    : 0;
+    const stepsToday = stepRecord && stepRecord.recordedAt >= today
+      ? stepRecord.count
+      : 0;
 
     const state: CombatSessionState = {
-      characterId,
+      characterId: character.id, // ID postaci
+      userId: character.userId,  // ID gracza
       enemyId,
       playerHp: character.hp,
       enemyHp: enemy.hp,
@@ -108,7 +116,6 @@ private async saveSession(sessionId: string, state: CombatSessionState) {
       characterDefense: character.defense,
       characterMaxHp: character.maxHp,
       characterTotalSteps: stepsToday,
-      characterUserId: character.userId,
       characterClass: character.class?.name ?? null,
       characterBonus: character.class?.bonus ?? null,
       characterTurn: 0,
@@ -135,19 +142,20 @@ private async saveSession(sessionId: string, state: CombatSessionState) {
 
   async processAction(
     sessionId: string,
-    characterId: string,
+    userId: string, // UWAGA: tu też przychodzi userId z kontrolera
     action: CombatActionType,
   ) {
     const state = await this.getSession(sessionId);
 
-    if (state.characterId !== characterId) {
+    // Weryfikacja po userId zabezpiecza, by żaden inny gracz nie kliknął akcji w tej sesji
+    if (state.userId !== userId) {
       throw new BadRequestException('To nie twoja sesja walki');
     }
     if (state.status !== 'ACTIVE') {
       throw new BadRequestException('Walka już się zakończyła');
     }
 
-    state.characterTurn += 1;  // ← po walidacji
+    state.characterTurn += 1;
     const turnLog: typeof state.log = [];
 
     // ── AKCJA GRACZA ──────────────────────────────────────────
@@ -212,7 +220,7 @@ private async saveSession(sessionId: string, state: CombatSessionState) {
           action: 'MONK_INSTANT_WIN',
         });
       }  else {
-        state.enemyHp -= damage;  // ← tylko jeśli nie było instant win
+        state.enemyHp -= damage;
       }
 
       turnLog.push({
@@ -288,57 +296,68 @@ private async saveSession(sessionId: string, state: CombatSessionState) {
 
   // ── FINALIZACJA ───────────────────────────────────────────────
 
-private async finalizeSession(sessionId: string, state: CombatSessionState) {
-  const won = state.status === 'WON';
+  private async finalizeSession(sessionId: string, state: CombatSessionState) {
+    const won = state.status === 'WON';
 
-  const battle = await this.prisma.battle.create({
-    data: {
-      characterId: state.characterId,
-      enemyId: state.enemyId,
-      sessionId,
-      status: won ? 'WON' : 'LOST',
-      log: state.log,
-    },
-  });
-
-  await this.prisma.combatSession.update({
-    where: { id: sessionId },
-    data: { status: won ? 'WON' : 'LOST' },
-  });
-
-  let levelUp: { levelsGained: number; newLevel: number; hpGain: number; attackGain: number; defenseGain: number } | null = null;
-
-  if (won) {
-    await this.prisma.character.update({
-      where: { id: state.characterId },
+    const battle = await this.prisma.battle.create({
       data: {
-        exp:  { increment: state.enemyExpReward },
-        gold: { increment: state.enemyGoldReward },
-        hp:   state.playerHp,
+        characterId: state.characterId, // Tu też używamy zapisanego w sesji character.id
+        enemyId: state.enemyId,
+        sessionId,
+        status: won ? 'WON' : 'LOST',
+        log: state.log,
       },
     });
 
-    levelUp = await this.handleLeveling(state.characterId);  // ← wywołanie
-  }
+    await this.prisma.combatSession.update({
+      where: { id: sessionId },
+      data: { status: won ? 'WON' : 'LOST' },
+    });
 
-  await this.deleteSession(sessionId);
+    let levelUp: { levelsGained: number; newLevel: number; hpGain: number; attackGain: number; defenseGain: number } | null = null;
 
-  return {
-    result: won ? 'Victory!' : 'Defeat',
-    sessionId,
-    battleId: battle.id,
-    remainingHp: state.playerHp,
-    rewards: won
-      ? { exp: state.enemyExpReward, gold: state.enemyGoldReward }
-      : null,
-    levelUp,
-    log: state.log,
-      };
+    if (won) {
+      await this.prisma.character.update({
+        where: { id: state.characterId },
+        data: {
+          exp:  { increment: state.enemyExpReward },
+          gold: { increment: state.enemyGoldReward },
+          hp:   state.playerHp,
+        },
+      });
+
+      levelUp = await this.handleLeveling(state.characterId);
     }
 
-    async getCombatHistory(characterId: string) {
+    await this.deleteSession(sessionId);
+
+    return {
+      result: won ? 'Victory!' : 'Defeat',
+      sessionId,
+      battleId: battle.id,
+      remainingHp: state.playerHp,
+      rewards: won
+        ? { exp: state.enemyExpReward, gold: state.enemyGoldReward }
+        : null,
+      levelUp,
+      log: state.log,
+    };
+  }
+
+  // ── POBIERANIE HISTORII ────────────────────────────────────────
+
+  async getCombatHistory(userId: string) { // UWAGA: przychodzi userId!
+    // Najpierw pobierz id postaci, do której należy historia
+    const character = await this.prisma.character.findUnique({
+      where: { userId }
+    });
+
+    if (!character) {
+      return { stats: { won: 0, lost: 0, total: 0 }, battles: [] };
+    }
+
     const battles = await this.prisma.battle.findMany({
-      where: { characterId },
+      where: { characterId: character.id }, // Używamy character.id
       select: {
         id: true,
         status: true,
@@ -353,7 +372,7 @@ private async finalizeSession(sessionId: string, state: CombatSessionState) {
         },
       },
       orderBy: { createdAt: 'desc' },
-      take: 20, // ostatnie 20 walk
+      take: 20, 
     });
 
     const won = battles.filter(b => b.status === 'WON').length;
@@ -365,56 +384,55 @@ private async finalizeSession(sessionId: string, state: CombatSessionState) {
     };
   }
 
-    private calculateStepBonus(totalSteps: number, bonus: string | null): number {
-      const maxSteps = bonus === 'SCOUT' ? 7000 : 5000;
-      const maxBonus = bonus === 'SCOUT' ? 0.7 : 0.5;
-      const ratio = Math.min(totalSteps, maxSteps) / maxSteps;
-      return ratio * maxBonus;
+  // ── SYSTEMY WEWNĘTRZNE ─────────────────────────────────────────
+
+  private calculateStepBonus(totalSteps: number, bonus: string | null): number {
+    const maxSteps = bonus === 'SCOUT' ? 7000 : 5000;
+    const maxBonus = bonus === 'SCOUT' ? 0.7 : 0.5;
+    const ratio = Math.min(totalSteps, maxSteps) / maxSteps;
+    return ratio * maxBonus;
   }
 
-    private async handleLeveling(characterId: string) {
-      const character = await this.prisma.character.findUnique({
-        where: { id: characterId },
-        include: { class: true },
-      });
+  private async handleLeveling(characterId: string) {
+    const character = await this.prisma.character.findUnique({
+      where: { id: characterId },
+      include: { class: true },
+    });
 
-      if (!character) return null;
+    if (!character) return null;
 
-      const expForNextLevel = character.level * 100;
+    const expForNextLevel = character.level * 100;
 
-      if (character.exp < expForNextLevel) return null;
+    if (character.exp < expForNextLevel) return null;
 
-      // Oblicz ile levelów naraz (jeśli zdobył dużo exp)
-      let newLevel = character.level;
-      let remainingExp = character.exp;
+    let newLevel = character.level;
+    let remainingExp = character.exp;
 
-      while (remainingExp >= newLevel * 100) {
-        remainingExp -= newLevel * 100;
-        newLevel += 1;
-      }
-
-      const levelsGained = newLevel - character.level;
-
-      // Przelicz statystyki na podstawie klasy
-      const hpGain     = (character.class?.hpPerLevel ?? 10) * levelsGained;
-      const attackGain = (character.class?.attackPerLevel ?? 2) * levelsGained;
-      const defenseGain = (character.class?.defensePerLevel ?? 1) * levelsGained;
-
-      // Mnich nie skaluje ataku
-      const finalAttackGain = character.class?.bonus === 'MONK_REGEN' ? 0 : attackGain;
-
-      await this.prisma.character.update({
-        where: { id: characterId },
-        data: {
-          level:   newLevel,
-          exp:     remainingExp,
-          maxHp:   { increment: hpGain },
-          hp:      { increment: hpGain }, // HP rośnie razem z maxHp
-          attack:  { increment: finalAttackGain },
-          defense: { increment: defenseGain },
-        },
-      });
-
-      return { levelsGained, newLevel, hpGain, attackGain: finalAttackGain, defenseGain };
+    while (remainingExp >= newLevel * 100) {
+      remainingExp -= newLevel * 100;
+      newLevel += 1;
     }
+
+    const levelsGained = newLevel - character.level;
+
+    const hpGain     = (character.class?.hpPerLevel ?? 10) * levelsGained;
+    const attackGain = (character.class?.attackPerLevel ?? 2) * levelsGained;
+    const defenseGain = (character.class?.defensePerLevel ?? 1) * levelsGained;
+
+    const finalAttackGain = character.class?.bonus === 'MONK_REGEN' ? 0 : attackGain;
+
+    await this.prisma.character.update({
+      where: { id: characterId },
+      data: {
+        level:   newLevel,
+        exp:     remainingExp,
+        maxHp:   { increment: hpGain },
+        hp:      { increment: hpGain },
+        attack:  { increment: finalAttackGain },
+        defense: { increment: defenseGain },
+      },
+    });
+
+    return { levelsGained, newLevel, hpGain, attackGain: finalAttackGain, defenseGain };
+  }
 }

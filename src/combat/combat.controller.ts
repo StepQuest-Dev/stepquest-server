@@ -11,16 +11,19 @@ export class CombatController {
 
   @Post('start')
   async startCombat(@Body() dto: StartCombatDto, @Request() req: any) {
-    return this.combatService.startCombat(req.user.characterId, dto.enemyId);
+    const userId = req.user?.userId || req.user?.id || req.user?.sub;
+    return this.combatService.startCombat(userId, dto.enemyId);
   }
 
   @Post('action')
   async processAction(@Body() dto: CombatActionDto, @Request() req: any) {
-    return this.combatService.processAction(dto.sessionId, req.user.characterId, dto.action);
+    const userId = req.user?.userId || req.user?.id || req.user?.sub;
+    return this.combatService.processAction(dto.sessionId, userId, dto.action);
   }
 
   @Get('history')
   async getCombatHistory(@Request() req: any) {
-    return this.combatService.getCombatHistory(req.user.characterId);
+    const userId = req.user?.userId || req.user?.id || req.user?.sub;
+    return this.combatService.getCombatHistory(userId);
   }
 }

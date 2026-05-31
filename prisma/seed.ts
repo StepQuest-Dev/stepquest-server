@@ -18,6 +18,7 @@ async function main() {
 
   // Czyszczenie bazy (kolejność usuwania jest ważna ze względu na klucze obce!)
   // Najpierw tabele zależne, na końcu User i Enemy
+  await prisma.discoveredPlace.deleteMany({});
   await prisma.battle.deleteMany({});
   await prisma.combatSession.deleteMany({});
   await prisma.stepRecord.deleteMany({});
