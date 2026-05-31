@@ -6,15 +6,21 @@ import { CreateStepDto } from './dto/create-step.dto';
 export class StepsService {
   constructor(private prisma: PrismaService) {}
 
-  async saveSteps(userId: string, dto: CreateStepDto) {
+    async saveSteps(userId: string, dto: CreateStepDto) {
     if (dto.count <= 0) {
       throw new BadRequestException('count must be greater than 0');
     }
 
     const recordedAt = dto.recordedAt ? new Date(dto.recordedAt) : new Date();
 
-    return this.prisma.stepRecord.create({
-      data: {
+    return this.prisma.stepRecord.upsert({
+      where: { userId },
+      update: {
+        count: dto.count,
+        recordedAt,
+        source: dto.source,
+      },
+      create: {
         userId,
         count: dto.count,
         recordedAt,
@@ -30,13 +36,14 @@ export class StepsService {
       take: 50,
     });
 
+    // Maksymalna wartość = aktualna liczba kroków (front wysyła sumę, nie deltę)
     const aggregated = await this.prisma.stepRecord.aggregate({
       where: { userId },
-      _sum: { count: true },
+      _max: { count: true },
     });
 
     return {
-      totalSteps: aggregated._sum.count ?? 0,
+      totalSteps: aggregated._max.count ?? 0,
       records,
     };
   }

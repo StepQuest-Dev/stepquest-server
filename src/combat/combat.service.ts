@@ -18,6 +18,8 @@ interface CombatSessionState {
   characterAttack: number;
   characterDefense: number;
   characterMaxHp: number;
+  characterTotalSteps: number;
+  characterUserId: string;
   enemyName: string;
   enemyAttack: number;
   enemyDefense: number;
@@ -42,7 +44,6 @@ export class CombatService {
 
 private async getSession(sessionId: string): Promise<CombatSessionState> {
   const raw = await this.redis.get(this.sessionKey(sessionId));
-  console.log('GET session:', sessionId, '→', raw ? 'FOUND' : 'NOT FOUND');
   if (!raw) throw new NotFoundException('Sesja walki nie istnieje lub wygasła');
   return JSON.parse(raw) as CombatSessionState;
 }
@@ -54,7 +55,6 @@ private async saveSession(sessionId: string, state: CombatSessionState) {
     'EX',
     SESSION_TTL_SECONDS,
   );
-  console.log('SAVE session:', sessionId, '→', result, 'turn:', state.turn, 'enemyHp:', state.enemyHp);
 }
 
   private async deleteSession(sessionId: string) {
@@ -80,6 +80,17 @@ private async saveSession(sessionId: string, state: CombatSessionState) {
       data: { characterId, enemyId, status: 'PENDING' },
     });
 
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const stepRecord = await this.prisma.stepRecord.findUnique({
+      where: { userId: character.userId },
+    });
+
+      const stepsToday = stepRecord && stepRecord.recordedAt >= today
+    ? stepRecord.count
+    : 0;
+
     const state: CombatSessionState = {
       characterId,
       enemyId,
@@ -92,6 +103,8 @@ private async saveSession(sessionId: string, state: CombatSessionState) {
       characterAttack: character.attack,
       characterDefense: character.defense,
       characterMaxHp: character.maxHp,
+      characterTotalSteps: stepsToday,
+      characterUserId: character.userId,
       enemyName: enemy.name,
       enemyAttack: enemy.attack,
       enemyDefense: enemy.defense,
@@ -152,7 +165,9 @@ private async saveSession(sessionId: string, state: CombatSessionState) {
         });
       }
     } else if (action === CombatActionType.ATTACK) {
-      const damage = Math.max(1, state.characterAttack - state.enemyDefense);
+      const stepBonus = this.calculateStepBonus(state.characterTotalSteps);
+      const baseDamage = Math.max(1, state.characterAttack - state.enemyDefense);
+      const damage = Math.floor(baseDamage * (1 + stepBonus));
       state.enemyHp -= damage;
       turnLog.push({
         attacker: state.characterName,
@@ -288,5 +303,12 @@ private async saveSession(sessionId: string, state: CombatSessionState) {
       stats: { won, lost, total: battles.length },
       battles,
     };
+  }
+
+    private calculateStepBonus(totalSteps: number): number {
+    const maxSteps = 5000;
+    const maxBonus = 0.5; // 50%
+    const ratio = Math.min(totalSteps, maxSteps) / maxSteps;
+    return ratio * maxBonus;
   }
 }
