@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 import * as dotenv from 'dotenv';
+import * as bcrypt from 'bcrypt';
 
 // 1. Ładujemy zmienne środowiskowe
 dotenv.config();
@@ -18,6 +19,7 @@ async function main() {
   // Czyszczenie bazy (kolejność usuwania jest ważna ze względu na klucze obce!)
   // Najpierw tabele zależne, na końcu User i Enemy
   await prisma.battle.deleteMany({});
+  await prisma.combatSession.deleteMany({});
   await prisma.stepRecord.deleteMany({});
   await prisma.character.deleteMany({});
   await prisma.user.deleteMany({});
@@ -26,11 +28,14 @@ async function main() {
   console.log('🧹 Baza wyczyszczona.');
 
   // 1. Tworzymy użytkownika i od razu przypisaną do niego postać
+
+  const passwordHash = await bcrypt.hash('Haslo123', 10);
+
   const user = await prisma.user.create({
     data: {
       email: 'test@test.com',
       username: 'UZ1',
-      passwordHash: 'Haslo123', // Tu wleci hash gdy dodasz auth
+      passwordHash: passwordHash, // Tu wleci hash gdy dodasz auth
       character: {
         create: {
           name: 'WojBody',
