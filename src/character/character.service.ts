@@ -20,6 +20,7 @@ export class CharacterService {
         defense: true,
         totalSteps: true,
         createdAt: true,
+        class: true,
       },
     });
 
