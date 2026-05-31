@@ -133,6 +133,7 @@ enum ClassBonus {
   SCOUT           // Zwiadowca: wyższy cap kroków 2000 więcej, do 70%
   DOUBLE_STRIKE   // Czarnoksiężnik: co 3. tura podwójne obrażenia
   MONK_REGEN      // Mnich: 1000 HP, 1 DMG, 2% na automatyczną wygraną, brak skalowania obrażeń z poziomem
+}
 
 model DiscoveredPlace {
   id           String    @id @default(uuid())
