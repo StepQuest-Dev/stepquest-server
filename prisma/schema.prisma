@@ -26,6 +26,8 @@ model Character {
   level     Int      @default(1)
   exp       Int      @default(0)
   gold      Int      @default(0)
+  classId   String?
+  class     Class?   @relation(fields: [classId], references: [id])
   
   hp          Int      @default(100)
   maxHp       Int      @default(100)
@@ -103,4 +105,31 @@ enum CombatAction {
   ATTACK
   FLEE
   USE_ITEM
+}
+
+model Class {
+  id          String      @id @default(uuid())
+  name        String      @unique
+  description String
+  
+  // Statystyki bazowe
+  baseHp      Int
+  baseAttack  Int
+  baseDefense Int
+  
+  // Współczynniki wzrostu na level
+  hpPerLevel      Int
+  attackPerLevel  Int
+  defensePerLevel Int
+
+  bonus           ClassBonus
+
+  characters  Character[]
+}
+
+enum ClassBonus {
+  WARRIOR       // Wojownik: +20% obrażeń przy HP < 50%
+  SCOUT           // Zwiadowca: wyższy cap kroków 2000 więcej, do 70%
+  DOUBLE_STRIKE   // Czarnoksiężnik: co 3. tura podwójne obrażenia
+  MONK_REGEN      // Mnich: 1000 HP, 1 DMG, 2% na automatyczną wygraną, brak skalowania obrażeń z poziomem
 }
