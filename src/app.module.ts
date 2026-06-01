@@ -8,8 +8,9 @@ import { CombatModule } from './combat/combat.module';
 import configuration from './config/configuration';
 import { EnemiesModule } from './enemies/enemies.module';
 import { CharacterModule } from './character/character.module';
-import { ClassesModule } from './classes/classes.module';
 import { PlacesModule } from './places/places.module';
+import { RaidsModule } from './raids/raids.module';
+import { ClassesModule } from './classes/classes.module';
 
 @Module({
   imports: [
@@ -33,8 +34,9 @@ import { PlacesModule } from './places/places.module';
     CombatModule,
     EnemiesModule,
     CharacterModule,
-    ClassesModule,
     PlacesModule,
+    RaidsModule,
+    ClassesModule,
   ],
 })
 export class AppModule {}

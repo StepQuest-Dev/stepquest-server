@@ -42,6 +42,8 @@ model Character {
   battles     Battle[]
   combatSessions CombatSession[]
   discoveredPlaces DiscoveredPlace[]
+  raidsStarted   Raid[] @relation("AttackerRelation")
+  raidsDefended  Raid[] @relation("DefenderRelation")
 }
 
 model StepRecord {
@@ -147,4 +149,24 @@ model DiscoveredPlace {
   discoveredAt DateTime  @default(now())
   isCollected  Boolean   @default(false)
   collectedAt  DateTime?
+}
+
+model Raid {
+  id          String     @id @default(uuid())
+  attackerId  String
+  attacker    Character  @relation("AttackerRelation", fields: [attackerId], references: [id])
+  defenderId  String
+  defender    Character  @relation("DefenderRelation", fields: [defenderId], references: [id])
+  startTime   DateTime   @default(now())
+  endTime     DateTime
+  status      RaidStatus @default(PENDING)
+  winChance   Float      @default(0.7)
+  createdAt   DateTime   @default(now())
+}
+
+enum RaidStatus {
+  PENDING
+  WON
+  LOST
+  REPELLED
 }
