@@ -7,27 +7,20 @@ import helmet from 'helmet';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  app.enableCors({
-      origin: '*',
-      methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-      preflightContinue: false,
-      optionsSuccessStatus: 204,
-    });
-
-  const config = app.get(ConfigService);
-
   app.use(helmet({
     crossOriginResourcePolicy: false,
+    crossOriginOpenerPolicy: false,
+    crossOriginEmbedderPolicy: false,
   }));
-  
+
   app.enableCors({
-    origin: (origin, callback) => {
-      callback(null, true);
-    },
+    origin: true, // Automatycznie odzwierciedla Origin żądania
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
-    allowedHeaders: 'Content-Type, Accept, Authorization',
+    allowedHeaders: 'Content-Type, Accept, Authorization, ngrok-skip-browser-warning',
   });
+
+  const config = app.get(ConfigService);
 
   app.useGlobalPipes(
     new ValidationPipe({
