@@ -44,6 +44,57 @@ model Character {
   discoveredPlaces DiscoveredPlace[]
   raidsStarted   Raid[] @relation("AttackerRelation")
   raidsDefended  Raid[] @relation("DefenderRelation")
+  inventory   InventoryItem[]
+}
+
+model Item {
+  id          String   @id @default(uuid())
+  name        String
+  description String
+  type        ItemType
+  slot        EquipmentSlot? // null dla przedmiotów zużywalnych
+  
+  attackBonus  Int      @default(0)
+  defenseBonus Int      @default(0)
+  hpBonus      Int      @default(0)
+  
+  price       Int      @default(0)
+  imageUrl    String?
+
+  inventoryItems InventoryItem[]
+}
+
+model InventoryItem {
+  id          String    @id @default(uuid())
+  characterId String
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  itemId      String
+  item        Item      @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  
+  quantity    Int       @default(1)
+  isEquipped  Boolean   @default(false)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+enum ItemType {
+  WEAPON
+  ARMOR
+  CONSUMABLE
+  MATERIAL
+}
+
+enum EquipmentSlot {
+  HEAD
+  NECK
+  CHEST
+  BACK
+  HANDS
+  LEGS
+  FEET
+  WEAPON
+  SHIELD
 }
 
 model StepRecord {

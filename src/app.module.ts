@@ -11,6 +11,7 @@ import { CharacterModule } from './character/character.module';
 import { PlacesModule } from './places/places.module';
 import { RaidsModule } from './raids/raids.module';
 import { ClassesModule } from './classes/classes.module';
+import { InventoryModule } from './inventory/inventory.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { ClassesModule } from './classes/classes.module';
     PlacesModule,
     RaidsModule,
     ClassesModule,
+    InventoryModule,
   ],
 })
 export class AppModule {}

@@ -83,6 +83,51 @@ async function main() {
 
   console.log('⚔️ Klasy utworzone.');
 
+  // 1.5 Tworzymy Przedmioty
+  await prisma.item.createMany({
+    data: [
+      {
+        name: 'Skórzany Hełm',
+        description: 'Podstawowa ochrona głowy.',
+        type: 'ARMOR',
+        slot: 'HEAD',
+        defenseBonus: 2,
+        price: 50,
+      },
+      {
+        name: 'Skórzany Pancerz',
+        description: 'Lekki pancerz dla początkujących.',
+        type: 'ARMOR',
+        slot: 'CHEST',
+        defenseBonus: 5,
+        price: 150,
+      },
+      {
+        name: 'Zniszczony Miecz',
+        description: 'Stary, zardzewiały miecz.',
+        type: 'WEAPON',
+        slot: 'WEAPON',
+        attackBonus: 3,
+        price: 30,
+      },
+      {
+        name: 'Drewniana Tarcza',
+        description: 'Prosta tarcza z desek.',
+        type: 'ARMOR',
+        slot: 'SHIELD',
+        defenseBonus: 3,
+        price: 40,
+      },
+      {
+        name: 'Mikstura Zdrowia',
+        description: 'Przywraca 20 HP.',
+        type: 'CONSUMABLE',
+        price: 25,
+      },
+    ],
+  });
+
+  console.log('📦 Przedmioty utworzone.');
 
   const passwordHash = await bcrypt.hash('Haslo123', 10);
 
@@ -107,6 +152,30 @@ async function main() {
           exp: 0,
           totalSteps: 0,
           classId: warriorClass!.id,
+          inventory: {
+            create: [
+              {
+                item: { connect: { id: (await prisma.item.findFirst({ where: { name: 'Skórzany Hełm' } }))!.id } },
+                isEquipped: true,
+              },
+              {
+                item: { connect: { id: (await prisma.item.findFirst({ where: { name: 'Skórzany Pancerz' } }))!.id } },
+                isEquipped: true,
+              },
+              {
+                item: { connect: { id: (await prisma.item.findFirst({ where: { name: 'Zniszczony Miecz' } }))!.id } },
+                isEquipped: true,
+              },
+              {
+                item: { connect: { id: (await prisma.item.findFirst({ where: { name: 'Drewniana Tarcza' } }))!.id } },
+                isEquipped: true,
+              },
+              {
+                item: { connect: { id: (await prisma.item.findFirst({ where: { name: 'Mikstura Zdrowia' } }))!.id } },
+                quantity: 3,
+              },
+            ],
+          },
         },
       },
     },

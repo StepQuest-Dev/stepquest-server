@@ -21,6 +21,11 @@ export class CharacterService {
         totalSteps: true,
         createdAt: true,
         class: true,
+        inventory: {
+          include: {
+            item: true,
+          },
+        },
       },
     });
 
@@ -28,7 +33,25 @@ export class CharacterService {
       throw new NotFoundException('Postać nie istnieje');
     }
 
-    return character;
+    // Obliczanie efektywnych statystyk
+    let attackBonus = 0;
+    let defenseBonus = 0;
+    let hpBonus = 0;
+
+    character.inventory.forEach(inv => {
+      if (inv.isEquipped) {
+        attackBonus += inv.item.attackBonus;
+        defenseBonus += inv.item.defenseBonus;
+        hpBonus += inv.item.hpBonus;
+      }
+    });
+
+    return {
+      ...character,
+      effectiveAttack: character.attack + attackBonus,
+      effectiveDefense: character.defense + defenseBonus,
+      effectiveMaxHp: character.maxHp + hpBonus,
+    };
   }
 
   // --- NOWA METODA: Tworzenie postaci ---

@@ -67,12 +67,17 @@ export class CombatService {
 
   // ── START ─────────────────────────────────────────────────────
 
-  async startCombat(userId: string, enemyId: string) { // UWAGA: przychodzi userId!
+  async startCombat(userId: string, enemyId: string) {
 
     // 1. ZNAJDŹ POSTAĆ NA PODSTAWIE userId Z TOKENA
     const character = await this.prisma.character.findUnique({
       where: { userId }, 
-      include: { class: true },
+      include: { 
+        class: true,
+        inventory: {
+          include: { item: true }
+        }
+      },
     });
 
     const enemy = await this.prisma.enemy.findUnique({
@@ -82,6 +87,24 @@ export class CombatService {
     if (!character || !enemy) {
       throw new NotFoundException('Postać gracza lub przeciwnik nie istnieje');
     }
+
+    // Obliczanie bonusów z ekwipunku
+    let attackBonus = 0;
+    let defenseBonus = 0;
+    let hpBonus = 0;
+
+    character.inventory.forEach(inv => {
+      if (inv.isEquipped) {
+        attackBonus += inv.item.attackBonus;
+        defenseBonus += inv.item.defenseBonus;
+        hpBonus += inv.item.hpBonus;
+      }
+    });
+
+    const effectiveAttack = character.attack + attackBonus;
+    const effectiveDefense = character.defense + defenseBonus;
+    const effectiveMaxHp = character.maxHp + hpBonus;
+    const effectiveHp = Math.min(character.hp, effectiveMaxHp); // Zachowaj aktualne HP, ale nie więcej niż nowe max
 
     // 2. TWORZENIE SESJI: Używamy character.id (prawdziwego ID postaci)!
     const session = await this.prisma.combatSession.create({
@@ -107,15 +130,15 @@ export class CombatService {
       characterId: character.id, // ID postaci
       userId: character.userId,  // ID gracza
       enemyId,
-      playerHp: character.hp,
+      playerHp: effectiveHp,
       enemyHp: enemy.hp,
       turn: 1,
       log: [],
       status: 'ACTIVE',
       characterName: character.name,
-      characterAttack: character.attack,
-      characterDefense: character.defense,
-      characterMaxHp: character.maxHp,
+      characterAttack: effectiveAttack,
+      characterDefense: effectiveDefense,
+      characterMaxHp: effectiveMaxHp,
       characterTotalSteps: stepsToday,
       characterClass: character.class?.name ?? null,
       characterBonus: character.class?.bonus ?? null,
