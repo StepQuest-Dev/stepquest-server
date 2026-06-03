@@ -21,6 +21,7 @@ interface CombatSessionState {
   characterMaxHp: number;
   characterTotalSteps: number;
   enemyName: string;
+  enemyImageUrl: string | null;
   enemyAttack: number;
   enemyDefense: number;
   enemyExpReward: number;
@@ -120,6 +121,7 @@ export class CombatService {
       characterBonus: character.class?.bonus ?? null,
       characterTurn: 0,
       enemyName: enemy.name,
+      enemyImageUrl: enemy.imageUrl,
       enemyAttack: enemy.attack,
       enemyDefense: enemy.defense,
       enemyExpReward: enemy.expReward,
@@ -134,6 +136,7 @@ export class CombatService {
       playerHp: state.playerHp,
       enemyHp: state.enemyHp,
       enemyName: state.enemyName,
+      enemyImageUrl: state.enemyImageUrl,
       availableActions: ['ATTACK', 'FLEE', 'USE_ITEM'],
     };
   }
@@ -288,6 +291,8 @@ export class CombatService {
       turn: state.turn,
       playerHp: state.playerHp,
       enemyHp: state.enemyHp,
+      enemyName: state.enemyName,
+      enemyImageUrl: state.enemyImageUrl,
       turnLog,
       status: 'ACTIVE',
       availableActions: ['ATTACK', 'FLEE', 'USE_ITEM'],

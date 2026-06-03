@@ -4,6 +4,7 @@ import { Pool } from 'pg';
 import * as dotenv from 'dotenv';
 import * as bcrypt from 'bcrypt';
 
+// Komenda npx ts-node prisma/seed.ts
 // 1. Ładujemy zmienne środowiskowe
 dotenv.config();
 
@@ -124,7 +125,7 @@ async function main() {
       defense: 2,
       goldReward: 15,
       expReward: 20,
-      imageUrl: 'goblin-icon',
+      imageUrl: 'stepquest-app/assets/images/framed-icons/goblin-icon-ramka.png',
     },
   });
 
@@ -137,7 +138,7 @@ async function main() {
       defense: 1,
       goldReward: 40,
       expReward: 55,
-      imageUrl: 'goblin-icon',
+      imageUrl: 'stepquest-app/assets/images/framed-icons/goblin-icon-ramka.png',
     },
   });
 
@@ -150,7 +151,7 @@ async function main() {
       defense: 5,
       goldReward: 85,
       expReward: 130,
-      imageUrl: 'goblin-icon',
+      imageUrl: 'stepquest-app/assets/images/framed-icons/goblin-icon-ramka.png',
     },
   });
 
