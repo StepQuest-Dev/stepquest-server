@@ -69,6 +69,7 @@ export class AuthService {
         sub: user.id,
         characterId: character?.id ?? null,
       }),
+      hasCharacter: !!character,
     };
   }
 

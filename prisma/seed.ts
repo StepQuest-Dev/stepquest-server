@@ -114,10 +114,9 @@ async function main() {
 
   console.log(`👤 Stworzono użytkownika: ${user.username} z postacią: ${user.character?.name}`);
 
-  // 2. Tworzymy Goblina (z Twoim konkretnym ID)
-  const enemy = await prisma.enemy.create({
+  // 2. Tworzymy Przeciwników
+  const goblin = await prisma.enemy.create({
     data: {
-      id: '495f98e0-c31b-40c9-8dfd-58b66d187e9b',
       name: 'Goblin',
       level: 1,
       hp: 50,
@@ -125,14 +124,37 @@ async function main() {
       defense: 2,
       goldReward: 15,
       expReward: 20,
+      imageUrl: 'goblin-icon',
+    },
+  });
+
+  const skeleton = await prisma.enemy.create({
+    data: {
+      name: 'Szkielet',
+      level: 3,
+      hp: 75,
+      attack: 18,
+      defense: 1,
+      goldReward: 40,
+      expReward: 55,
+      imageUrl: 'goblin-icon',
+    },
+  });
+
+  const boar = await prisma.enemy.create({
+    data: {
+      name: 'Dzik',
+      level: 5,
+      hp: 100,
+      attack: 12,
+      defense: 5,
+      goldReward: 85,
+      expReward: 130,
+      imageUrl: 'goblin-icon',
     },
   });
 
   console.log('🌱 Baza danych została zasilona!');
-  console.log('-----------------------------------');
-  console.log('Ważne ID do testów walki:');
-  console.log(`Character ID: ${user.character?.id}`);
-  console.log(`Enemy ID:     ${enemy.id}`);
   console.log('-----------------------------------');
 }
 
